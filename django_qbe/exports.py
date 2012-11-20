@@ -2,6 +2,8 @@
 import codecs
 import csv
 from StringIO import StringIO
+from lxml import etree
+import re
 
 from django.http import HttpResponse
 from django.utils.datastructures import SortedDict
@@ -89,4 +91,23 @@ def ods_format(labels, results):
 def xls_format(labels, results):
     output = base_export(labels, results)
     mimetype = "application/vnd.ms-excel"
+    return HttpResponse(output, mimetype=mimetype)
+
+
+@formats.add("xml")
+def xml_format(labels, results):
+    items = etree.Element('items')
+    for result in results:
+        result_list = list(result)
+        item = etree.SubElement(items, 'item')
+        for i in range(len(labels)):
+            label = labels[i]
+            if '"' in label:
+                unquoted = re.findall('"([^"]*)"', labels[i])
+                label = unquoted[-1].replace(' ', '_')
+            element = etree.SubElement(item, label)
+            element.text = str(result_list[i])
+
+    output = etree.tostring(items, encoding='utf-8')
+    mimetype = "application/xml"
     return HttpResponse(output, mimetype=mimetype)
