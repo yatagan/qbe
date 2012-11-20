@@ -60,6 +60,10 @@
                 <th>{% trans "Field" %}</th>
                 <th>{% trans "Sort" %}</th>
                 <th>{% trans "Criteria" %}</th>
+                {% if math_operations_enabled %}
+                <th>{% trans "Operation" %}</th>
+                <th>{% trans "Operand" %}</th>
+                {% endif %}
                 <th>{% trans "Delete" %}</th>
             </tr>
         </thead>
@@ -72,6 +76,10 @@
                 <td>{{ form.field.errors }}{{ form.field }}</td>
                 <td>{{ form.sort.errors }}{{ form.sort }}</td>
                 <td>{{ form.criteria.errors }}{{ form.criteria }}</td>
+                {% if math_operations_enabled %}
+                <td>{{ form.operation.errors }}{{ form.operation }}</td>
+                <td>{{ form.operand_model.errors }}{{ form.operand_model }}{{ form.operand_field.errors }}{{ form.operand_field }}</td>
+                {% endif %}
                 <td class="delete"></td>
             </tr>
         {% endfor %}

@@ -30,6 +30,14 @@ SORT_CHOICES = (
     ("des", _("Descending")),
 )
 
+OPERATION_CHOICES = (
+    ("", ""),
+    ("+", _("+")),
+    ("-", _("-")),
+    ("*", _("*")),
+    ("/", _("/")),
+    )
+
 BACKEND_TO_OPERATIONS = {
     'mysql': 'MySQLOperations',
     'oracle': 'OracleOperations',
@@ -46,6 +54,9 @@ class QueryByExampleForm(forms.Form):
     criteria = forms.CharField(label=_("Criteria"), required=False)
     sort = forms.ChoiceField(label=_("Sort"), choices=SORT_CHOICES,
                              required=False)
+    operation = forms.CharField(label=_("Operation"), required=False)
+    operand_model = forms.CharField(label=_("Operand Model"), required=False)
+    operand_field = forms.CharField(label=_("Operand Field"), required=False)
 
     def __init__(self, *args, **kwargs):
         super(QueryByExampleForm, self).__init__(*args, **kwargs)
@@ -67,9 +78,21 @@ class QueryByExampleForm(forms.Form):
             field_attr_class = "qbeFillFields enable:sort,criteria"
         field_widget = forms.Select(attrs={'class': field_attr_class})
         self.fields['field'].widget = field_widget
+        math_operations = getattr(settings, 'QBE_MATH_OPERATIONS', False)
+        if math_operations:
+            operation_widget = forms.Select(attrs={},
+                                            choices=OPERATION_CHOICES)
+            self.fields['operation'].widget = operation_widget
+            operand_model_widget = forms.Select(attrs={'class': "qbeFillModels to:operand_field"})
+            self.fields['operand_model'].widget = operand_model_widget
+            self.fields['operand_field'].widget = field_widget
 
     def clean_model(self):
         model = self.cleaned_data['model']
+        return model.lower().replace(".", "_")
+
+    def clean_operand_model(self):
+        model = self.cleaned_data['operand_model']
         return model.lower().replace(".", "_")
 
     def clean_criteria(self):
@@ -180,7 +203,17 @@ class BaseQueryByExampleFormSet(BaseFormSet):
             operator, over = criteria
             is_join = operator.lower() == 'join'
             if show and not is_join:
-                selects.append(db_field)
+                math_operations = getattr(settings, 'QBE_MATH_OPERATIONS', False)
+                if math_operations:
+                    select = db_field
+                    operation = data["operation"]
+                    operand_model = data["operand_model"]
+                    operand_field = data["operand_field"]
+                    if operation and operand_model and operand_field:
+                        select += u" %s %s.%s" % (operation, qn(operand_model), qn(operand_field))
+                    selects.append(select)
+                else:
+                    selects.append(db_field)
             if alias and not is_join:
                 aliases.append(alias)
             if sort:
@@ -298,22 +331,26 @@ class BaseQueryByExampleFormSet(BaseFormSet):
                 else:
                     result = []
                 while i < l:
-                    appmodel, field = selects[i].split(".")
-                    appmodel = self._unquote_name(appmodel)
-                    field = self._unquote_name(field)
-                    try:
-                        if appmodel in self._models:
-                            _model = self._models[appmodel]
-                            _appmodel = u"%s_%s" % (_model._meta.app_label,
-                                                    _model._meta.module_name)
-                        else:
-                            _appmodel = appmodel
-                        admin_url = reverse("%s:%s_change" % (admin_name,
-                                                              _appmodel),
-                                             args=[row[i + 1]])
-                    except NoReverseMatch:
-                        admin_url = None
-                    result.append((row[i], admin_url))
+                    splitted = selects[i].split(".")
+                    if len(splitted) == 2:
+                        appmodel, field = splitted
+                        appmodel = self._unquote_name(appmodel)
+                        field = self._unquote_name(field)
+                        try:
+                            if appmodel in self._models:
+                                _model = self._models[appmodel]
+                                _appmodel = u"%s_%s" % (_model._meta.app_label,
+                                                        _model._meta.module_name)
+                            else:
+                                _appmodel = appmodel
+                            admin_url = reverse("%s:%s_change" % (admin_name,
+                                                                  _appmodel),
+                                                 args=[row[i + 1]])
+                        except NoReverseMatch:
+                            admin_url = None
+                        result.append((row[i], admin_url))
+                    else:
+                        result.append((row[i], None))
                     i += 2
                 results.append(result)
             return results
@@ -377,15 +414,21 @@ class BaseQueryByExampleFormSet(BaseFormSet):
         qn = self._db_operations.quote_name
         selects = []
         for select in self._selects:
-            appmodel, field = select.split(".")
-            appmodel = self._unquote_name(appmodel)
-            field = self._unquote_name(field)
-            selects.append(select)
-            if appmodel in self._models:
-                pk_name = self._models[appmodel]._meta.pk.name
+            splitted = select.split(".")
+            if len(splitted) == 2:
+                appmodel, field = splitted
+                appmodel = self._unquote_name(appmodel)
+                field = self._unquote_name(field)
+                selects.append(select)
+                if appmodel in self._models:
+                    pk_name = self._models[appmodel]._meta.pk.name
+                else:
+                    pk_name = u"id"
+                selects.append("%s.%s" % (qn(appmodel), qn(pk_name)))
             else:
-                pk_name = u"id"
-            selects.append("%s.%s" % (qn(appmodel), qn(pk_name)))
+                selects.append(select)
+                # workaround
+                selects.append(select)
         return selects
 
 QueryByExampleFormSet = formset_factory(QueryByExampleForm,

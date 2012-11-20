@@ -47,6 +47,7 @@ def qbe_form(request, query_hash=None):
         'query_hash': query_hash,
         'savedqueries_installed': 'django_qbe.savedqueries' in settings.INSTALLED_APPS,
         'aliases_enabled': getattr(settings, 'QBE_ALIASES', False),
+        'math_operations_enabled': getattr(settings, 'QBE_MATH_OPERATIONS', False),
     }
     return render(request, 'qbe.html', context)
 
