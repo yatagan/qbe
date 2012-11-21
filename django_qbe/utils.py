@@ -24,6 +24,8 @@ from django.core.exceptions import SuspiciousOperation
 from django.conf import settings
 from django.utils.importlib import import_module
 from django.utils.simplejson import dumps
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 
 try:
     # Default value to backwards compatibility
@@ -48,7 +50,7 @@ except ImportError:
 formats  # Makes pyflakes happy
 
 
-def qbe_models(admin_site=None, only_admin_models=False, json=False):
+def qbe_models(admin_site=None, only_admin_models=False, json=False, user=None):
     app_models = get_models(include_auto_created=True, include_deferred=True)
     app_models_with_no_includes = get_models(include_auto_created=False,
                                              include_deferred=False)
@@ -58,6 +60,17 @@ def qbe_models(admin_site=None, only_admin_models=False, json=False):
         admin_models = []
     if only_admin_models:
         app_models = admin_models
+
+    # Checking user permissions
+    if user:
+        permissed_models = list()
+        for model in app_models:
+            permission_representation = '%s.report_%s' % (model._meta.app_label, model._meta.module_name)
+            if user.has_perm(permission_representation):
+                permissed_models.append(model)
+
+        app_models = permissed_models
+
     graphs = {}
 
     def get_field_attributes(field):
@@ -435,3 +448,19 @@ def pickle_decode(session_data):
 
 def get_query_hash(data):
     return md5(data + settings.SECRET_KEY).hexdigest()
+
+
+def create_content_types_and_permissions_for_all_models():
+    app_models = get_models(include_auto_created=True, include_deferred=True)
+    for app_model in app_models:
+        meta = app_model._meta
+
+        content_type, just_created = ContentType.objects.get_or_create(app_label=meta.app_label, model=meta.module_name)
+        if just_created:
+            content_type.save()
+
+        permission, just_created = Permission.objects.get_or_create(codename='report_%s' % meta.module_name,
+                                                                    name='Can use in report',
+                                                                    content_type=content_type)
+        if just_created:
+            permission.save()

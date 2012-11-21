@@ -33,7 +33,7 @@ def qbe_form(request, query_hash=None):
         else:
             json_data = simplejson.dumps(data)
     apps = get_apps()
-    models = qbe_models(admin_site=admin_site, only_admin_models=False)
+    models = qbe_models(admin_site=admin_site, only_admin_models=False, user=request.user)
     json_models = qbe_models(admin_site=admin_site, json=True)
     context = {
         'apps': apps,
