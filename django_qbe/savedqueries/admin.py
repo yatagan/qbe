@@ -5,11 +5,12 @@ from django.contrib.admin.util import unquote
 from django.conf.urls.defaults import patterns, url
 from django.shortcuts import redirect
 from django.utils.functional import update_wrapper
+from django.contrib.auth.models import User
 
 from django_qbe.utils import pickle_encode, get_query_hash
 from django_qbe.utils import admin_site
 
-from .models import SavedQuery
+from .models import SavedQuery, SavedQueryPermission
 
 
 class SavedQueryAdmin(admin.ModelAdmin):
@@ -38,9 +39,10 @@ class SavedQueryAdmin(admin.ModelAdmin):
         return urlpatterns + super(SavedQueryAdmin, self).get_urls()
 
     def save_model(self, request, obj, form, change):
-        query_hash = request.GET.get("hash", "")
-        obj.query_hash = query_hash
-        obj.query_data = request.session["qbe_query_%s" % query_hash]
+        if not obj.query_hash:
+            query_hash = request.GET.get("hash", "")
+            obj.query_hash = query_hash
+        obj.query_data = request.session["qbe_query_%s" % obj.query_hash]
         obj.save()
 
     def add_view(self, request, *args, **kwargs):
@@ -61,3 +63,4 @@ class SavedQueryAdmin(admin.ModelAdmin):
         return redirect("qbe_results", query_hash)
 
 admin_site.register(SavedQuery, SavedQueryAdmin)
+admin_site.register(SavedQueryPermission)

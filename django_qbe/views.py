@@ -14,6 +14,7 @@ from django_qbe.utils import (autocomplete_graph, qbe_models, formats,
                               pickle_encode, pickle_decode, get_query_hash,
                               admin_site)
 
+from django_qbe.utils import user_passes_permissions
 
 qbe_access_for = getattr(settings, "QBE_ACCESS_FOR", lambda u: u.is_staff)
 
@@ -67,6 +68,7 @@ def qbe_proxy(request):
     return redirect("qbe_form")
 
 
+@user_passes_permissions
 @user_passes_test(qbe_access_for)
 def qbe_results(request, query_hash):
     query_key = "qbe_query_%s" % (query_hash or "")

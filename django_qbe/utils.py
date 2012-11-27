@@ -26,6 +26,9 @@ from django.utils.importlib import import_module
 from django.utils.simplejson import dumps
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.shortcuts import redirect
+
+from .savedqueries.models import SavedQuery, SavedQueryPermission
 
 try:
     # Default value to backwards compatibility
@@ -464,3 +467,28 @@ def create_content_types_and_permissions_for_all_models():
                                                                     content_type=content_type)
         if just_created:
             permission.save()
+
+
+def user_passes_permissions(qbe_results):
+    '''Checks user permission for query running
+    '''
+
+    def wrapper(*args, **kwargs):
+        query_hash = kwargs['query_hash']
+        query_set = SavedQuery.objects.filter(query_hash=query_hash)
+        # if the query was saved
+        if len(query_set) == 1:
+            query = query_set[0]
+            request = args[0]
+            if request.user != query.owner and not request.user.is_superuser:
+                # checking current user permissions
+                try:
+                    permissions = SavedQueryPermission.objects.get(query=query, user=request.user)
+                    permission = permissions[0]
+                    if not permission.can_run:
+                        raise SavedQueryPermission.DoesNotExist
+                except SavedQueryPermission.DoesNotExist:
+                    return redirect("qbe_form")
+
+        return qbe_results(*args, **kwargs)
+    return wrapper

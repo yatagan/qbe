@@ -1,6 +1,7 @@
 import pickle
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth.models import User, Group
 
 try:
     from django.utils.timezone import now
@@ -18,6 +19,7 @@ class SavedQuery(models.Model):
     query_data = PickledObjectField(protocol=pickle.HIGHEST_PROTOCOL)
     date_created = models.DateTimeField(_("date created"), default=now, editable=False)
     date_updated = models.DateTimeField(_("date updated"), editable=False)
+    owner = models.ForeignKey(User, verbose_name=_("owner"))
 
     class Meta:
         verbose_name = _("Saved query")
@@ -29,3 +31,11 @@ class SavedQuery(models.Model):
     def save(self, *args, **kwargs):
         self.date_updated = now()
         super(SavedQuery, self).save(*args, **kwargs)
+
+class SavedQueryPermission(models.Model):
+    query = models.ForeignKey(SavedQuery, null=True, blank=True, verbose_name=_("query"))
+
+    user = models.ForeignKey(User, verbose_name=_("user"), blank=True, null=True)
+    group = models.ForeignKey(Group, verbose_name=_("group"), blank=True, null=True)
+
+    can_run = models.BooleanField(_("can run"), default=True)
