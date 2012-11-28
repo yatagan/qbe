@@ -5,7 +5,7 @@ from django.contrib.admin.util import unquote
 from django.conf.urls.defaults import patterns, url
 from django.shortcuts import redirect
 from django.utils.functional import update_wrapper
-from django.contrib.auth.models import User
+from django.db.models import Q
 
 from django_qbe.utils import pickle_encode, get_query_hash
 from django_qbe.utils import admin_site
@@ -74,11 +74,12 @@ class SavedQueryAdmin(admin.ModelAdmin):
             # owner sees his stuff, otherwise checking user permission
             if query.owner != request.user:
                 try:
-                    permission = SavedQueryPermission.objects.get(user=request.user, query=query)
-                    if not permission.can_run:
-                        queries = queries.exclude(pk=query.pk)
+                    perm_q = Q(
+                        Q(user=request.user) | Q(group__user=request.user)
+                    ) & Q(can_run=True)
+                    permission = SavedQueryPermission.objects.get(perm_q)
                 except SavedQueryPermission.DoesNotExist:
-                    pass
+                    queries = queries.exclude(pk=query.pk)
         return queries
 
 

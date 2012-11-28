@@ -17,7 +17,7 @@ except ImportError:
                 for cc in combinations(items[i + 1:], n - 1):
                     yield [items[i]] + cc
 
-from django.db.models import get_models
+from django.db.models import get_models, Q
 from django.db.models.fields.related import (ForeignKey, OneToOneField,
                                              ManyToManyField)
 from django.core.exceptions import SuspiciousOperation
@@ -483,7 +483,10 @@ def user_passes_permissions(qbe_results):
             if request.user != query.owner and not request.user.is_superuser:
                 # checking current user permissions
                 try:
-                    permission = SavedQueryPermission.objects.get(query=query, user=request.user)
+                    perm_q = Q(query=query) & Q(
+                        Q(user=request.user) | Q(group__user=request.user)
+                    ) & Q(can_run=True)
+                    permission = SavedQueryPermission.objects.get(perm_q)
                     if not permission.can_run:
                         raise SavedQueryPermission.DoesNotExist
                 except SavedQueryPermission.DoesNotExist:
