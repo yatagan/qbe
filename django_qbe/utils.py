@@ -483,8 +483,7 @@ def user_passes_permissions(qbe_results):
             if request.user != query.owner and not request.user.is_superuser:
                 # checking current user permissions
                 try:
-                    permissions = SavedQueryPermission.objects.get(query=query, user=request.user)
-                    permission = permissions[0]
+                    permission = SavedQueryPermission.objects.get(query=query, user=request.user)
                     if not permission.can_run:
                         raise SavedQueryPermission.DoesNotExist
                 except SavedQueryPermission.DoesNotExist:

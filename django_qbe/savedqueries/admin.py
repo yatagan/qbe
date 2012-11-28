@@ -14,7 +14,7 @@ from .models import SavedQuery, SavedQueryPermission
 
 
 class SavedQueryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'date_created', 'query_hash',
+    list_display = ('name', 'owner', 'description', 'date_created', 'query_hash',
                     'run_link')
 
     def run_link(self, obj):
@@ -62,5 +62,28 @@ class SavedQueryAdmin(admin.ModelAdmin):
             request.session[query_key] = data
         return redirect("qbe_results", query_hash)
 
+    def queryset(self, request):
+        '''Filters SavedQueries due to current user permissions
+        '''
+
+        queries = super(SavedQueryAdmin, self).queryset(request)
+        # superuser sees all
+        if request.user.is_superuser:
+            return queries
+        for query in queries.all():
+            # owner sees his stuff, otherwise checking user permission
+            if query.owner != request.user:
+                try:
+                    permission = SavedQueryPermission.objects.get(user=request.user, query=query)
+                    if not permission.can_run:
+                        queries = queries.exclude(pk=query.pk)
+                except SavedQueryPermission.DoesNotExist:
+                    pass
+        return queries
+
+
+class SavedQueryPermissionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'group', 'query', 'can_run')
+
 admin_site.register(SavedQuery, SavedQueryAdmin)
-admin_site.register(SavedQueryPermission)
+admin_site.register(SavedQueryPermission, SavedQueryPermissionAdmin)
