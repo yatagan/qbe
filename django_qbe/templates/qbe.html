@@ -82,8 +82,16 @@
         <input type="hidden" name="positions" id="id_form_positions">
 <!--        <input type="button" name="autocomplete" id="autocomplete" value="{% trans "Auto complete" %}">-->
 <!--        <select name="autocompletionOptions" id="autocompletionOptions" style="display: none;"></select>-->
-        <input type="submit" name="_save" class="default" value="{% trans "Run" %}">
+        <input type="submit" name="_save" class="default" value="{% if explain_enable %}{% if explain_result %}{% trans "Run" %}{% else %}{% trans "Explain" %}{% endif %}{% else %}{% trans "Run" %}{% endif %}">
     </div>
+
+    {% if explain_result %}
+    <div id="explain_result">
+        <p><strong>Sql: </strong>{{ explain_result.0 }}</p>
+        <p><strong>Explain: </strong>{{ explain_result.1 }}</p>
+    </div>
+    <input type="hidden" name="explain" value="{{ explain_result }}">
+    {% endif %}
 
     <div >
         {% trans "Database" %}
