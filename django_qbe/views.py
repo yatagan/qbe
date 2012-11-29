@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from django.db.models import get_apps
+from django.db.models import get_apps, connection
 from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
 from django.core.urlresolvers import reverse
@@ -49,7 +49,14 @@ def qbe_form(request, query_hash=None):
         'savedqueries_installed': 'django_qbe.savedqueries' in settings.INSTALLED_APPS,
         'aliases_enabled': getattr(settings, 'QBE_ALIASES', False),
         'math_operations_enabled': getattr(settings, 'QBE_MATH_OPERATIONS', False),
+        'explain_enable': getattr(settings, "QBE_EXPLAIN", False),
     }
+
+    if getattr(settings, "QBE_EXPLAIN", False) and 'explain' in formset.data:
+        explain = formset.data['explain']
+        context['explain_result'] = explain
+        del formset.data['explain']
+
     return render(request, 'qbe.html', context)
 
 
@@ -60,6 +67,24 @@ def qbe_proxy(request):
         db_alias = request.session.get("qbe_database", "default")
         formset = QueryByExampleFormSet(data=data, using=db_alias)
         if formset.is_valid():
+
+            if getattr(settings, "QBE_EXPLAIN", False):
+                if 'explain' not in formset.data:
+                    sql = formset.get_raw_query(limit=None, offset=None,add_extra_ids=None)
+                    cursor = connection.cursor()
+                    cursor.execute("EXPLAIN %s" % sql)
+                    row = cursor.fetchone()
+
+                    formset.data['explain'] = (sql, row[0])
+
+                    pickled = pickle_encode(data)
+                    query_hash = get_query_hash(pickled)
+                    query_key = "qbe_query_%s" % query_hash
+                    request.session[query_key] = data
+                    return redirect("qbe_form", query_hash=query_hash)
+                else:
+                    del formset.data['explain']
+
             pickled = pickle_encode(data)
             query_hash = get_query_hash(pickled)
             query_key = "qbe_query_%s" % query_hash

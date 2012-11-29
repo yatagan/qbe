@@ -166,3 +166,7 @@ input.qbeCheckModels {
     overflow: auto;
     margin-top: 10px;
 }
+
+div#explain_result {
+    text-align: right;
+}
